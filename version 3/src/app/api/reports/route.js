@@ -10,6 +10,7 @@ export async function GET(req) {
         const report_type = searchParams.get("report_type");
         const store_id = searchParams.get("store_id");
         const supplier_id = searchParams.get("supplier_id");
+        const product_id = searchParams.get("product_id");
         const start_date = searchParams.get("start_date");
         const end_date = searchParams.get("end_date");
 
@@ -36,7 +37,7 @@ export async function GET(req) {
             return NextResponse.json({ success: false, error: "Invalid report type" }, { status: 400 });
         }
 
-        const cacheKey = `report:${report_type}:${store_id}:${supplier_id}:${start_date}:${end_date}`;
+        const cacheKey = `report:${report_type}:${store_id}:${supplier_id}:${product_id}:${start_date}:${end_date}`;
 
         const cachedData = await redis.get(cacheKey);
         if (cachedData) {
@@ -49,8 +50,12 @@ export async function GET(req) {
 
         if (report_type === "sales") {
             query = `
-                SELECT s.store_id, p.sku, p.name, s.purchase_price, 
-                       s.selling_price, SUM(s.quantity) AS total_sold, MAX(s.timestamp) AS last_sale
+                SELECT s.store_id, p.sku, p.name, s.supplier_id, s.purchase_price, 
+                       s.selling_price, 
+                       SUM(s.quantity) AS total_sold, 
+                       MAX(s.timestamp) AS last_sale,
+                       SUM(s.quantity * s.selling_price) AS total_revenue,
+                       AVG(s.selling_price) AS average_selling_price
                 FROM sales s
                 JOIN products p ON s.product_id = p.product_id
             `;
@@ -58,12 +63,20 @@ export async function GET(req) {
                 params.push(store_id);
                 conditions.push(`s.store_id = $${params.length}`);
             }
+            if (supplier_id) {
+                params.push(supplier_id);
+                conditions.push(`s.supplier_id = $${params.length}`);
+            }
             if (start_date && end_date) {
                 params.push(start_date, end_date);
                 conditions.push(`s.timestamp BETWEEN $${params.length - 1} AND $${params.length}`);
             }
+            if (product_id) {
+                params.push(product_id);
+                conditions.push(`s.product_id = $${params.length}`);
+            }
             query += conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-            query += " GROUP BY s.store_id, p.sku, p.name, s.purchase_price, s.selling_price";
+            query += " GROUP BY s.store_id, p.sku, p.name, s.supplier_id, s.purchase_price, s.selling_price";
         } else if (report_type === "stock-in") {
             query = `
                 SELECT si.store_id, p.sku, p.name, si.supplier_id, si.purchase_price, 
@@ -82,6 +95,10 @@ export async function GET(req) {
             if (start_date && end_date) {
                 params.push(start_date, end_date);
                 conditions.push(`si.timestamp BETWEEN $${params.length - 1} AND $${params.length}`);
+            }
+            if (product_id) {
+                params.push(product_id);
+                conditions.push(`si.product_id = $${params.length}`);
             }
             query += conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
             query += " GROUP BY si.store_id, p.sku, p.name, si.supplier_id, si.purchase_price";
@@ -104,6 +121,10 @@ export async function GET(req) {
                 params.push(start_date, end_date);
                 conditions.push(`rs.timestamp BETWEEN $${params.length - 1} AND $${params.length}`);
             }
+            if (product_id) {
+                params.push(product_id);
+                conditions.push(`rs.product_id = $${params.length}`);
+            }
             query += conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
             query += " GROUP BY rs.store_id, p.sku, p.name, rs.supplier_id, rs.purchase_price";
         } else if (report_type === "inventory") {
@@ -123,6 +144,10 @@ export async function GET(req) {
             if (supplier_id) {
                 params.push(supplier_id);
                 conditions.push(`i.supplier_id = $${params.length}`);
+            }
+            if (product_id) {
+                params.push(product_id);
+                conditions.push(`i.product_id = $${params.length}`);
             }
             query += conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
             query += " GROUP BY i.store_id, p.sku, p.name, i.supplier_id, i.purchase_price";
