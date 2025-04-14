@@ -80,6 +80,20 @@ Bazaar Technologies needs robust inventory systems to:
 - **API Rate Limiting** for protection and stability
 
 ---
+## 🧰 Tech Stack
+
+- **Backend:** Next.js (API Routes)
+- **Database:**
+  - SQLite (Stage 1 – local single-store)
+  - PostgreSQL (Stage 2+ – multi-store, scalable)
+- **Caching:** Upstash Redis (Stage 3)
+- **Process Manager:** PM2
+- **Replication:** PostgreSQL Master-Replica with Docker
+- **Rate Limiting:** Custom middleware
+- **Asynchronous Events:** Node.js EventEmitter
+- **Containerization:** Docker
+- **Logging & Auditing:** Custom AuditLog table (Stage 3)
+---
 
 ## 🛡️ Security & Performance Enhancements
 
